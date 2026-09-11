@@ -1,12 +1,14 @@
 const $ = (id) => document.getElementById(id);
 let selectedImage = false;
-let scanData = {healthy:35, damaged:6, rotten:3, sprouted:2, undersized:2, total:48};
+let selectedImageUrl = '';
+let scanData = {healthy:16, damaged:3, rotten:1, sprouted:1, undersized:1, total:22};
 
+// Navigation
 document.querySelectorAll('.nav-item').forEach(btn => btn.addEventListener('click', () => showView(btn.dataset.view)));
 $('startScan').onclick = () => showView('scan');
 $('openReports').onclick = () => showView('reports');
 $('newScanFromReports').onclick = () => showView('scan');
-$('chooseFile').onclick = () => $('fileInput').click();
+$('chooseFile').onclick = (e) => { e.stopPropagation(); $('fileInput').click(); };
 $('dropzone').addEventListener('click', e => { if(e.target.tagName !== 'BUTTON') $('fileInput').click(); });
 $('fileInput').addEventListener('change', e => handleFile(e.target.files[0]));
 $('scanBtn').onclick = runScan;
@@ -22,58 +24,94 @@ function showView(view){
 }
 
 function handleFile(file){
-  if(!file) return;
+  if(!file || !file.type.startsWith('image/')) return;
   selectedImage = true;
   const reader = new FileReader();
   reader.onload = e => {
-    $('previewImg').src = e.target.result;
-    $('previewImg').style.display='block';
-    document.querySelector('.empty-preview').style.display='none';
-    $('scanBtn').disabled=false;
-    $('scanState').textContent='Image ready';
+    selectedImageUrl = e.target.result;
+
+    // Show the SAME uploaded image in both the upload preview and the scanner.
+    $('previewImg').src = selectedImageUrl;
+    $('previewImg').style.display = 'block';
+    document.querySelector('.empty-preview').style.display = 'none';
+
+    $('scanImage').src = selectedImageUrl;
+    $('scanImage').style.display = 'block';
+    $('scanner').classList.add('has-image');
+
+    $('scanBtn').disabled = false;
+    $('scanState').textContent = 'Image ready';
+    $('scanMessage').textContent = 'Ready to inspect uploaded image';
+    $('scanSub').textContent = 'Your onion batch will remain visible during scanning';
+    $('processedCount').textContent = '';
+    $('boxes').innerHTML = '';
   };
   reader.readAsDataURL(file);
 }
 
 function runScan(){
-  $('scanBtn').disabled=true;
-  $('scanState').textContent='Scanning…';
-  $('scanner').classList.add('scanning');
-  $('scanMessage').textContent='AI vision is inspecting the batch';
-  $('scanSub').textContent='Detecting defects, size and quality';
-  $('boxes').innerHTML='';
-  const labels=['Healthy','Healthy','Damaged','Healthy','Rotten','Sprouted','Healthy','Undersized'];
-  labels.forEach((label,i)=>{
-    setTimeout(()=>{
-      const box=document.createElement('div');
-      box.className='detect-box';
-      box.style.left=(8+((i*17)%75))+'%';
-      box.style.top=(13+((i*23)%63))+'%';
-      box.style.width=(9+(i%3)*3)+'%';
-      box.style.height=(14+(i%2)*7)+'%';
-      box.innerHTML=`<span class="detect-label">${label} · ${(91+i%7)}%</span>`;
-      $('boxes').appendChild(box);
-    },450+i*230);
+  if(!selectedImageUrl) return;
+  $('scanBtn').disabled = true;
+  $('reportBtn').classList.add('hidden');
+  $('scanState').textContent = 'Scanning…';
+  $('scanner').classList.add('scanning','has-image');
+  $('scanMessage').textContent = 'AI vision is inspecting your uploaded batch';
+  $('scanSub').textContent = 'Detecting defects, size and quality';
+  $('processedCount').textContent = '0/22 onions processed';
+  $('boxes').innerHTML = '';
+
+  // Demo detection positions. They appear ON TOP OF THE UPLOADED IMAGE,
+  // rather than replacing it with a black scanner screen.
+  const detections = [
+    ['Healthy',92,8,13,14,18],
+    ['Healthy',88,49,10,14,18],
+    ['Damaged',76,30,24,12,19],
+    ['Healthy',91,67,16,12,18],
+    ['Rotten',93,53,50,13,20],
+    ['Sprouted',81,6,56,12,20],
+    ['Undersized',87,34,64,12,18],
+    ['Healthy',90,76,54,12,18]
+  ];
+
+  detections.forEach((item,i)=>{
+    setTimeout(()=>addDetection(item), 500 + i*260);
   });
+
+  // Show progressive processing count while the uploaded image stays visible.
+  const progress = [4,7,10,13,16,19,22];
+  progress.forEach((count,i)=>{
+    setTimeout(()=> $('processedCount').textContent = `${count}/22 onions processed`, 420+i*380);
+  });
+
   setTimeout(()=>{
     $('scanner').classList.remove('scanning');
-    $('scanMessage').textContent='Inspection complete';
-    $('scanSub').textContent='Quality classes detected successfully';
+    $('scanMessage').textContent = 'Inspection complete';
+    $('scanSub').textContent = 'All 22 onions analyzed successfully';
+    $('processedCount').textContent = '22/22 processed';
     generateResults();
-    $('scanState').textContent='Complete';
+    $('scanState').textContent = 'Complete';
     $('reportBtn').classList.remove('hidden');
-    $('scanBtn').disabled=false;
-  },3300);
+    $('scanBtn').disabled = false;
+  }, 3300);
+}
+
+function addDetection(item){
+  const [label,confidence,left,top,width,height] = item;
+  const box=document.createElement('div');
+  box.className='detect-box';
+  box.dataset.label=label.toLowerCase();
+  box.style.left=left+'%';
+  box.style.top=top+'%';
+  box.style.width=width+'%';
+  box.style.height=height+'%';
+  box.innerHTML=`<span class="detect-label">${label} · ${confidence}%</span>`;
+  $('boxes').appendChild(box);
 }
 
 function generateResults(){
-  const variance=Math.floor(Math.random()*7)-3;
-  scanData.healthy=Math.max(1,35+variance);
-  scanData.damaged=6;
-  scanData.rotten=3;
-  scanData.sprouted=2;
-  scanData.undersized=2;
-  scanData.total=scanData.healthy+13;
+  // Prototype batch is fixed to the user's 22-onion demo batch.
+  // Replace this section with YOLO/OpenCV API results when the real model is connected.
+  scanData={healthy:16,damaged:3,rotten:1,sprouted:1,undersized:1,total:22};
   const grade=Math.round(scanData.healthy/scanData.total*100);
   const ids=['healthyCount','damagedCount','rottenCount','sproutedCount','undersizedCount'];
   [scanData.healthy,scanData.damaged,scanData.rotten,scanData.sprouted,scanData.undersized].forEach((v,i)=>$(ids[i]).textContent=v);
@@ -90,7 +128,9 @@ function generateResults(){
 function updateReport(){
   const grade=Math.round(scanData.healthy/scanData.total*100), urs=100-grade;
   $('reportBatch').textContent='Batch #PP-0013 · '+new Date().toLocaleDateString();
-  $('reportGrade').textContent=grade+'%'; $('reportUrs').textContent=urs+'%'; $('reportTotal').textContent=scanData.total;
+  $('reportGrade').textContent=grade+'%';
+  $('reportUrs').textContent=urs+'%';
+  $('reportTotal').textContent=scanData.total;
   const pairs=[['repHealthy','barHealthy',scanData.healthy],['repDamaged','barDamaged',scanData.damaged],['repRotten','barRotten',scanData.rotten],['repSprouted','barSprouted',scanData.sprouted],['repUndersized','barUndersized',scanData.undersized]];
   pairs.forEach(([n,b,v])=>{$(n).textContent=v;$(b).style.width=(v/scanData.total*100)+'%'});
 }
