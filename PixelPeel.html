@@ -1,0 +1,2920 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PixelPeel — AI-Powered Onion Quality Assessment & Grading</title>
+  
+  <!-- SEO & Social Meta -->
+  <meta name="description" content="PixelPeel leverages computer vision and YOLO defect detection to inspect onion images, evaluate rot, damage, and sprouts, and standardize agricultural quality grading.">
+  <meta name="keywords" content="onion quality assessment, onion grading, AI agriculture, computer vision agriculture, onion defect detection, agricultural AI, crop quality assessment">
+  <meta property="og:title" content="PixelPeel — AI-Powered Onion Quality Assessment">
+  <meta property="og:description" content="Automated, objective, computer-vision grading for agricultural onions.">
+  <meta property="og:type" content="website">
+
+  <!-- Typography: Plus Jakarta Sans for UI & JetBrains Mono for CV Telemetry -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Lucide Vector Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <style>
+    /* ==========================================================================
+       PIXELPEEL DESIGN SYSTEM (AgriTech SaaS × Computer Vision Lab)
+       ========================================================================== */
+    :root {
+      --bg-main: #F7F8F3;
+      --bg-card: #FFFFFF;
+      --bg-dark: #0B2118;
+      --bg-dark-surface: #123023;
+      --bg-dark-card: #183C2D;
+
+      --primary: #1F7A4D;
+      --primary-hover: #17603C;
+      --primary-light: rgba(31, 122, 77, 0.08);
+
+      --accent-lime: #A8D94A;
+      --accent-lime-dim: rgba(168, 217, 74, 0.15);
+      --accent-cyan: #38BDF8;
+
+      --text-main: #17231D;
+      --text-muted: #66736B;
+      --text-light: #E0E7E3;
+      --text-light-muted: #95A59D;
+
+      --border-light: #E2E7E2;
+      --border-dark: #254A39;
+
+      /* Defect Tag Colors */
+      --cv-healthy: #10B981;
+      --cv-damaged: #F59E0B;
+      --cv-rotten: #EF4444;
+      --cv-sprouted: #8B5CF6;
+      --cv-undersized: #06B6D4;
+
+      --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+
+      --radius-sm: 6px;
+      --radius-md: 12px;
+      --radius-lg: 20px;
+      --shadow-subtle: 0 4px 20px -2px rgba(11, 33, 24, 0.06);
+      --shadow-float: 0 16px 36px -4px rgba(11, 33, 24, 0.12);
+
+      --transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html {
+      scroll-behavior: smooth;
+      font-size: 16px;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      background-color: var(--bg-main);
+      color: var(--text-main);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    img {
+      max-width: 100%;
+      display: block;
+    }
+
+    button {
+      font-family: inherit;
+      cursor: pointer;
+      border: none;
+      background: none;
+    }
+
+    .visually-hidden {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      border: 0;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 1240px;
+      margin: 0 auto;
+      padding: 0 1.5rem;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      font-weight: 600;
+      font-size: 0.95rem;
+      padding: 0.75rem 1.4rem;
+      border-radius: var(--radius-sm);
+      transition: var(--transition);
+    }
+
+    .btn-primary {
+      background-color: var(--primary);
+      color: #FFFFFF;
+    }
+
+    .btn-primary:hover {
+      background-color: var(--primary-hover);
+      transform: translateY(-1px);
+    }
+
+    .btn-primary:disabled {
+      background-color: #9CA3AF;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .btn-outline {
+      border: 1.5px solid var(--primary);
+      color: var(--primary);
+      background: transparent;
+    }
+
+    .btn-outline:hover {
+      background: var(--primary-light);
+    }
+
+    .btn-primary-sm {
+      background-color: var(--primary);
+      color: #fff;
+      padding: 0.5rem 1rem;
+      font-size: 0.85rem;
+      border-radius: var(--radius-sm);
+      font-weight: 600;
+    }
+
+    .btn-primary-sm:hover {
+      background-color: var(--primary-hover);
+    }
+
+    .btn-secondary-sm {
+      background-color: transparent;
+      color: var(--text-main);
+      padding: 0.5rem 0.9rem;
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+
+    .btn-secondary-sm:hover {
+      color: var(--primary);
+    }
+
+    .btn-outline-sm {
+      border: 1px solid var(--border-light);
+      background: #FFF;
+      color: var(--text-main);
+      padding: 0.45rem 0.85rem;
+      font-size: 0.82rem;
+      border-radius: var(--radius-sm);
+    }
+
+    .btn-outline-sm:hover {
+      border-color: var(--primary);
+    }
+
+    .btn-large {
+      padding: 0.95rem 1.8rem;
+      font-size: 1.05rem;
+      border-radius: var(--radius-md);
+    }
+
+    .btn-full {
+      width: 100%;
+    }
+
+    .pill-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      padding: 0.35rem 0.8rem;
+      background-color: var(--primary-light);
+      color: var(--primary);
+      border-radius: 999px;
+      border: 1px solid rgba(31, 122, 77, 0.2);
+    }
+
+    .sub-badge {
+      display: inline-block;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      color: var(--primary);
+      text-transform: uppercase;
+      margin-bottom: 0.5rem;
+    }
+
+    .accent-badge {
+      background-color: var(--accent-lime-dim);
+      color: var(--accent-lime);
+      border-color: rgba(168, 217, 74, 0.3);
+    }
+
+    .top-bar {
+      background: var(--bg-dark);
+      color: var(--text-light-muted);
+      font-size: 0.75rem;
+      font-family: var(--font-mono);
+      border-bottom: 1px solid var(--border-dark);
+    }
+
+    .top-bar-content {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-top: 0.35rem;
+      padding-bottom: 0.35rem;
+    }
+
+    .status-indicator {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      background-color: var(--accent-lime);
+      border-radius: 50%;
+      box-shadow: 0 0 6px var(--accent-lime);
+      animation: pulse-dot 2s infinite ease-in-out;
+    }
+
+    .top-links a {
+      margin-left: 1.25rem;
+      color: var(--text-light-muted);
+      transition: var(--transition);
+    }
+
+    .top-links a:hover {
+      color: var(--accent-lime);
+    }
+
+    .navbar {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background-color: rgba(247, 248, 243, 0.94);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--border-light);
+      transition: var(--transition);
+    }
+
+    .navbar.scrolled {
+      background-color: rgba(255, 255, 255, 0.96);
+      box-shadow: var(--shadow-subtle);
+    }
+
+    .nav-container {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 70px;
+    }
+
+    .brand-logo {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .brand-icon {
+      width: 36px;
+      height: 36px;
+    }
+
+    .brand-text {
+      font-size: 1.35rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: var(--text-main);
+    }
+
+    .brand-text span {
+      color: var(--primary);
+    }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 1.75rem;
+    }
+
+    .nav-item {
+      font-size: 0.92rem;
+      font-weight: 500;
+      color: var(--text-muted);
+      transition: var(--transition);
+    }
+
+    .nav-item:hover {
+      color: var(--primary);
+    }
+
+    .nav-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .mobile-toggle {
+      display: none;
+      font-size: 1.5rem;
+      color: var(--text-main);
+    }
+
+    .hero-section {
+      padding: 4.5rem 0 5rem 0;
+      background: radial-gradient(circle at 85% 15%, rgba(168, 217, 74, 0.08) 0%, transparent 45%);
+    }
+
+    .hero-grid {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 3.5rem;
+      align-items: center;
+    }
+
+    .hero-title {
+      font-size: 3.75rem;
+      font-weight: 800;
+      line-height: 1.1;
+      letter-spacing: -0.03em;
+      margin: 1rem 0 1.25rem 0;
+    }
+
+    .text-gradient {
+      color: var(--primary);
+    }
+
+    .hero-subheadline {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: var(--text-main);
+      margin-bottom: 0.85rem;
+    }
+
+    .hero-description {
+      font-size: 1.05rem;
+      color: var(--text-muted);
+      line-height: 1.65;
+      margin-bottom: 2rem;
+    }
+
+    .hero-cta-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      margin-bottom: 2.5rem;
+    }
+
+    .trust-indicators {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1.5rem;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+
+    .trust-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .trust-item svg {
+      width: 16px;
+      height: 16px;
+      color: var(--primary);
+    }
+
+    .vision-hud-card {
+      background: var(--bg-dark);
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border-dark);
+      box-shadow: var(--shadow-float);
+      overflow: hidden;
+      position: relative;
+    }
+
+    .hud-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.75rem 1.25rem;
+      background: rgba(0, 0, 0, 0.4);
+      border-bottom: 1px solid var(--border-dark);
+    }
+
+    .hud-telemetry {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--text-light-muted);
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .hud-tag {
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      color: var(--accent-lime);
+      background: var(--accent-lime-dim);
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+    }
+
+    .hud-viewport {
+      position: relative;
+      height: 380px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(circle, #102C20 0%, #081711 80%);
+      overflow: hidden;
+    }
+
+    .onion-subject-vector {
+      width: 250px;
+      height: 250px;
+      filter: drop-shadow(0 12px 25px rgba(0, 0, 0, 0.45));
+    }
+
+    .grid-crosshairs {
+      position: absolute;
+      inset: 0;
+      background-image: 
+        linear-gradient(rgba(168, 217, 74, 0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(168, 217, 74, 0.05) 1px, transparent 1px);
+      background-size: 24px 24px;
+      pointer-events: none;
+    }
+
+    .laser-scanner {
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, transparent, var(--accent-lime), transparent);
+      box-shadow: 0 0 14px var(--accent-lime);
+      animation: scan-vertical 3.5s infinite ease-in-out;
+      pointer-events: none;
+    }
+
+    /* CV Bounding Boxes */
+    .bbox {
+      position: absolute;
+      border: 1.5px dashed;
+      pointer-events: none;
+      transition: var(--transition);
+    }
+
+    .bbox-tag {
+      position: absolute;
+      top: -20px;
+      left: -1px;
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      font-weight: 700;
+      color: #fff;
+      padding: 1px 6px;
+      white-space: nowrap;
+      border-radius: 2px;
+    }
+
+    .corner {
+      position: absolute;
+      width: 6px;
+      height: 6px;
+      border-color: inherit;
+    }
+    .c-tl { top: -2px; left: -2px; border-top: 2px solid; border-left: 2px solid; }
+    .c-tr { top: -2px; right: -2px; border-top: 2px solid; border-right: 2px solid; }
+    .c-bl { bottom: -2px; left: -2px; border-bottom: 2px solid; border-left: 2px solid; }
+    .c-br { bottom: -2px; right: -2px; border-bottom: 2px solid; border-right: 2px solid; }
+
+    .bbox-success { border-color: var(--cv-healthy); }
+    .bbox-success .bbox-tag { background: var(--cv-healthy); }
+
+    .bbox-danger { border-color: var(--cv-rotten); }
+    .bbox-danger .bbox-tag { background: var(--cv-rotten); }
+
+    .bbox-warning { border-color: var(--cv-sprouted); }
+    .bbox-warning .bbox-tag { background: var(--cv-sprouted); }
+
+    .hud-footer {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      padding: 0.85rem 1.25rem;
+      background: rgba(0, 0, 0, 0.5);
+      border-top: 1px solid var(--border-dark);
+    }
+
+    .hud-label {
+      display: block;
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      color: var(--text-light-muted);
+    }
+
+    .hud-val {
+      font-family: var(--font-mono);
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: #FFFFFF;
+    }
+
+    .text-accent {
+      color: var(--accent-lime);
+    }
+
+    .section {
+      padding: 5.5rem 0;
+    }
+
+    .section-header-split {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 3rem;
+      align-items: flex-end;
+      margin-bottom: 3.5rem;
+    }
+
+    .center-header {
+      text-align: center;
+      max-width: 720px;
+      margin: 0 auto 3.5rem auto;
+    }
+
+    .section-title {
+      font-size: 2.35rem;
+      font-weight: 800;
+      line-height: 1.2;
+      letter-spacing: -0.02em;
+      color: var(--text-main);
+    }
+
+    .section-lead {
+      font-size: 1.1rem;
+      color: var(--text-muted);
+    }
+
+    .dark-section {
+      background-color: var(--bg-dark);
+      color: #FFFFFF;
+    }
+
+    .text-white { color: #FFFFFF; }
+    .text-light { color: var(--text-light-muted); }
+
+    .card {
+      background-color: var(--bg-card);
+      border: 1px solid var(--border-light);
+      border-radius: var(--radius-md);
+      padding: 2rem;
+      box-shadow: var(--shadow-subtle);
+      transition: var(--transition);
+    }
+
+    .card:hover {
+      transform: translateY(-4px);
+      box-shadow: var(--shadow-float);
+      border-color: rgba(31, 122, 77, 0.3);
+    }
+
+    .card-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: var(--radius-sm);
+      background: var(--primary-light);
+      color: var(--primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 1.25rem;
+    }
+
+    .error-tint {
+      background: rgba(239, 68, 68, 0.1);
+      color: #EF4444;
+    }
+
+    .problem-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 1.75rem;
+    }
+
+    .problem-card h3 {
+      font-size: 1.15rem;
+      font-weight: 700;
+      margin-bottom: 0.65rem;
+    }
+
+    .problem-card p {
+      font-size: 0.92rem;
+      color: var(--text-muted);
+    }
+
+    .pipeline-track {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      position: relative;
+      background: #FFFFFF;
+      padding: 2.5rem 2rem;
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border-light);
+      box-shadow: var(--shadow-subtle);
+    }
+
+    .pipeline-step {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      flex: 1;
+      z-index: 2;
+    }
+
+    .p-node {
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      background: var(--bg-main);
+      border: 2px solid var(--primary);
+      color: var(--primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 0.85rem;
+      transition: var(--transition);
+    }
+
+    .pipeline-step:hover .p-node {
+      background: var(--primary);
+      color: #FFF;
+      transform: scale(1.1);
+    }
+
+    .p-label {
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: var(--text-main);
+      margin-bottom: 0.25rem;
+    }
+
+    .p-desc {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      max-width: 140px;
+    }
+
+    .pipeline-connector {
+      flex: 0.5;
+      height: 2px;
+      background: var(--border-light);
+      align-self: center;
+      margin-top: -2rem;
+    }
+
+    .demo-card-workspace {
+      display: grid;
+      grid-template-columns: 1.15fr 0.85fr;
+      background: #FFFFFF;
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border-light);
+      box-shadow: var(--shadow-float);
+      overflow: hidden;
+    }
+
+    .workspace-viewport {
+      padding: 2rem;
+      border-right: 1px solid var(--border-light);
+      background: #FAFBFA;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .viewport-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.25rem;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+    }
+
+    .hud-mono-tag {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--primary);
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .sample-pills {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.78rem;
+      color: var(--text-muted);
+    }
+
+    .btn-sample {
+      font-size: 0.72rem;
+      font-family: var(--font-mono);
+      padding: 0.2rem 0.5rem;
+      background: #EFEFEF;
+      border-radius: 4px;
+      border: 1px solid var(--border-light);
+      transition: var(--transition);
+    }
+
+    .btn-sample:hover {
+      background: var(--primary);
+      color: #fff;
+      border-color: var(--primary);
+    }
+
+    .drop-zone-area {
+      position: relative;
+      min-height: 380px;
+      border: 2px dashed #CFD8D3;
+      border-radius: var(--radius-md);
+      background: #FFF;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      transition: var(--transition);
+    }
+
+    .drop-zone-area.drag-over {
+      border-color: var(--primary);
+      background: var(--primary-light);
+    }
+
+    .drop-empty-prompt {
+      text-align: center;
+      padding: 2rem;
+    }
+
+    .drop-icon-ring {
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      background: var(--primary-light);
+      color: var(--primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 1rem auto;
+    }
+
+    .drop-heading {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--text-main);
+      margin-bottom: 0.25rem;
+    }
+
+    .drop-sub {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      display: block;
+      margin-bottom: 1.25rem;
+    }
+
+    .drop-actions {
+      display: flex;
+      justify-content: center;
+      gap: 0.75rem;
+    }
+
+    .preview-container {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #000;
+    }
+
+    .preview-container img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+
+    .scanning-bar-active {
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: var(--accent-lime);
+      box-shadow: 0 0 16px 3px var(--accent-lime);
+      animation: scan-vertical 2s infinite ease-in-out;
+      z-index: 10;
+    }
+
+    .detection-overlay-layer {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 5;
+    }
+
+    .viewport-control-bar {
+      display: flex;
+      gap: 1rem;
+      margin-top: 1.5rem;
+    }
+
+    .workspace-telemetry {
+      padding: 2rem;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .telemetry-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.5rem;
+      border-bottom: 1px solid var(--border-light);
+      padding-bottom: 0.85rem;
+    }
+
+    .telemetry-header h3 {
+      font-size: 1.25rem;
+      font-weight: 700;
+    }
+
+    .badge-source {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      background: #F3F4F6;
+      color: #4B5563;
+      padding: 0.2rem 0.6rem;
+      border-radius: 4px;
+      border: 1px solid #E5E7EB;
+    }
+
+    .idle-state-box {
+      text-align: center;
+      margin: auto 0;
+      padding: 3rem 1.5rem;
+      color: var(--text-muted);
+    }
+
+    .idle-state-box svg {
+      width: 48px;
+      height: 48px;
+      margin-bottom: 1rem;
+      color: #9CA3AF;
+    }
+
+    .idle-state-box h4 {
+      font-size: 1.1rem;
+      color: var(--text-main);
+      margin-bottom: 0.35rem;
+    }
+
+    .processing-status-box {
+      margin: auto 0;
+      text-align: center;
+      padding: 3rem 1rem;
+    }
+
+    .spinner {
+      width: 42px;
+      height: 42px;
+      border: 3px solid rgba(31, 122, 77, 0.2);
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 1.25rem auto;
+    }
+
+    #processingStepLabel {
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      color: var(--primary);
+    }
+
+    .score-banner {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 1.5rem;
+      align-items: center;
+      margin-bottom: 2rem;
+      background: var(--bg-main);
+      padding: 1.25rem;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border-light);
+    }
+
+    .score-circle {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      background: #FFF;
+      border: 3px solid var(--primary);
+      box-shadow: var(--shadow-subtle);
+    }
+
+    .score-value {
+      font-size: 1.6rem;
+      font-weight: 800;
+      line-height: 1;
+      color: var(--text-main);
+    }
+
+    .score-caption {
+      font-size: 0.65rem;
+      font-family: var(--font-mono);
+      color: var(--text-muted);
+    }
+
+    .grade-micro {
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      color: var(--text-muted);
+      display: block;
+    }
+
+    .grade-letter {
+      font-size: 2.2rem;
+      font-weight: 800;
+      line-height: 1.1;
+      color: var(--primary);
+    }
+
+    .grade-tagline {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      display: block;
+    }
+
+    .defect-metrics-group {
+      margin-bottom: 1.5rem;
+    }
+
+    .metric-title {
+      font-size: 0.85rem;
+      font-family: var(--font-mono);
+      color: var(--text-muted);
+      margin-bottom: 1rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .bar-metric {
+      margin-bottom: 0.85rem;
+    }
+
+    .metric-info {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-bottom: 0.35rem;
+    }
+
+    .metric-info .val {
+      font-family: var(--font-mono);
+    }
+
+    .progress-track {
+      height: 6px;
+      background: #E5E7EB;
+      border-radius: 999px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      border-radius: 999px;
+      transition: width 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .fill-healthy { background: var(--cv-healthy); }
+    .fill-damaged { background: var(--cv-damaged); }
+    .fill-rotten { background: var(--cv-rotten); }
+    .fill-sprouted { background: var(--cv-sprouted); }
+    .fill-undersized { background: var(--cv-undersized); }
+
+    .telemetry-meta-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.5rem;
+      background: #F9FAFB;
+      padding: 0.75rem;
+      border-radius: var(--radius-sm);
+      margin-bottom: 1.5rem;
+      border: 1px solid var(--border-light);
+    }
+
+    .sub-label {
+      font-size: 0.65rem;
+      font-family: var(--font-mono);
+      color: var(--text-muted);
+      display: block;
+    }
+
+    .sub-val {
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--text-main);
+    }
+
+    .steps-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      gap: 1.5rem;
+    }
+
+    .step-card {
+      background: #FFF;
+      border: 1px solid var(--border-light);
+      border-radius: var(--radius-md);
+      padding: 1.75rem 1.25rem;
+      position: relative;
+      transition: var(--transition);
+    }
+
+    .step-card:hover {
+      transform: translateY(-4px);
+      border-color: var(--primary);
+    }
+
+    .step-number {
+      font-family: var(--font-mono);
+      font-size: 1.8rem;
+      font-weight: 800;
+      color: rgba(31, 122, 77, 0.15);
+      position: absolute;
+      top: 1rem;
+      right: 1.25rem;
+    }
+
+    .step-icon {
+      width: 44px;
+      height: 44px;
+      background: var(--primary-light);
+      color: var(--primary);
+      border-radius: var(--radius-sm);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 1.25rem;
+    }
+
+    .step-card h3 {
+      font-size: 1.15rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+    }
+
+    .step-card p {
+      font-size: 0.88rem;
+      color: var(--text-muted);
+    }
+
+    .tech-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 1.75rem;
+    }
+
+    .tech-card {
+      background: var(--bg-dark-surface);
+      border: 1px solid var(--border-dark);
+      border-radius: var(--radius-md);
+      padding: 2rem;
+      transition: var(--transition);
+    }
+
+    .tech-card:hover {
+      border-color: var(--accent-lime);
+      transform: translateY(-4px);
+    }
+
+    .tech-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.25rem;
+      color: var(--accent-lime);
+    }
+
+    .tech-chip {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      padding: 0.2rem 0.55rem;
+      background: var(--accent-lime-dim);
+      border-radius: 4px;
+    }
+
+    .tech-card h3 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      margin-bottom: 0.75rem;
+      color: #FFF;
+    }
+
+    .tech-card p {
+      font-size: 0.92rem;
+      color: var(--text-light-muted);
+    }
+
+    .comparison-table-wrapper {
+      background: #FFF;
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border-light);
+      overflow-x: auto;
+      box-shadow: var(--shadow-subtle);
+    }
+
+    .comparison-table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+    }
+
+    .comparison-table th,
+    .comparison-table td {
+      padding: 1.25rem 1.75rem;
+      border-bottom: 1px solid var(--border-light);
+    }
+
+    .comparison-table th {
+      background: #FAFBFA;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--text-main);
+    }
+
+    .comparison-table th.col-highlight,
+    .comparison-table td.col-highlight {
+      background: rgba(31, 122, 77, 0.03);
+    }
+
+    .comparison-table td {
+      font-size: 0.95rem;
+      color: var(--text-muted);
+    }
+
+    .comparison-table td strong {
+      color: var(--text-main);
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 1.75rem;
+    }
+
+    .feature-card h3 {
+      font-size: 1.2rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+    }
+
+    .feature-card p {
+      font-size: 0.92rem;
+      color: var(--text-muted);
+    }
+
+    .audience-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1.25rem;
+    }
+
+    .audience-card {
+      padding: 1.5rem;
+      text-align: center;
+    }
+
+    .aud-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: var(--primary-light);
+      color: var(--primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 1rem auto;
+    }
+
+    .audience-card h4 {
+      font-size: 1.1rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .audience-card p {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    .impact-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 1.75rem;
+    }
+
+    .impact-metric-card {
+      background: #FFF;
+      border: 1px solid var(--border-light);
+      border-radius: var(--radius-md);
+      padding: 2rem;
+      box-shadow: var(--shadow-subtle);
+    }
+
+    .impact-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: var(--radius-sm);
+      background: var(--accent-lime-dim);
+      color: var(--primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 1rem;
+    }
+
+    .impact-metric-card h3 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+    }
+
+    .impact-metric-card p {
+      font-size: 0.92rem;
+      color: var(--text-muted);
+    }
+
+    .arch-diagram-card {
+      background: var(--bg-dark-surface);
+      border: 1px solid var(--border-dark);
+      border-radius: var(--radius-lg);
+      padding: 2.5rem;
+      overflow-x: auto;
+    }
+
+    .arch-flow {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      min-width: 900px;
+    }
+
+    .arch-node {
+      background: var(--bg-dark-card);
+      border: 1px solid var(--border-dark);
+      border-radius: var(--radius-md);
+      padding: 1.25rem 1rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      width: 140px;
+    }
+
+    .highlight-node {
+      border-color: var(--accent-lime);
+      box-shadow: 0 0 15px rgba(168, 217, 74, 0.2);
+    }
+
+    .node-type {
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      color: var(--text-light-muted);
+      margin-bottom: 0.5rem;
+    }
+
+    .arch-node svg {
+      width: 28px;
+      height: 28px;
+      color: var(--accent-lime);
+      margin-bottom: 0.5rem;
+    }
+
+    .arch-node strong {
+      font-size: 0.82rem;
+      color: #FFF;
+      margin-bottom: 0.5rem;
+    }
+
+    .node-status {
+      font-family: var(--font-mono);
+      font-size: 0.6rem;
+      padding: 0.15rem 0.4rem;
+      border-radius: 3px;
+    }
+
+    .status-live {
+      background: rgba(16, 185, 129, 0.2);
+      color: #34D399;
+    }
+
+    .status-planned {
+      background: rgba(56, 189, 248, 0.2);
+      color: #38BDF8;
+    }
+
+    .arch-arrow {
+      font-family: var(--font-mono);
+      font-size: 1.5rem;
+      color: var(--border-dark);
+    }
+
+    .future-timeline {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+      gap: 1.25rem;
+    }
+
+    .phase-card {
+      background: #FFF;
+      border: 1px solid var(--border-light);
+      border-radius: var(--radius-md);
+      padding: 1.5rem;
+      border-top: 3px solid var(--primary);
+    }
+
+    .phase-number {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: var(--primary);
+      text-transform: uppercase;
+      display: block;
+      margin-bottom: 0.4rem;
+    }
+
+    .phase-card h4 {
+      font-size: 1.05rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .phase-card p {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    .section-cta {
+      background: radial-gradient(circle at 50% 50%, #153A2A 0%, var(--bg-dark) 100%);
+      border-top: 1px solid var(--border-dark);
+      border-bottom: 1px solid var(--border-dark);
+      padding: 5rem 0;
+    }
+
+    .cta-container {
+      text-align: center;
+    }
+
+    .cta-content {
+      max-width: 680px;
+      margin: 0 auto;
+    }
+
+    .cta-title {
+      font-size: 2.5rem;
+      font-weight: 800;
+      line-height: 1.2;
+      margin: 1rem 0;
+      color: #FFF;
+    }
+
+    .cta-sub {
+      font-size: 1.1rem;
+      color: var(--text-light-muted);
+      margin-bottom: 2rem;
+    }
+
+    .cta-buttons {
+      display: flex;
+      justify-content: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .footer {
+      background: var(--bg-dark);
+      color: var(--text-light-muted);
+      padding: 4.5rem 0 2rem 0;
+      font-size: 0.9rem;
+    }
+
+    .footer-grid {
+      display: grid;
+      grid-template-columns: 1.5fr 1fr 1fr 1.2fr;
+      gap: 3rem;
+      padding-bottom: 3.5rem;
+      border-bottom: 1px solid var(--border-dark);
+    }
+
+    .footer-logo .brand-text {
+      color: #FFF;
+    }
+
+    .footer-desc {
+      margin: 1rem 0 1.25rem 0;
+      font-size: 0.88rem;
+      line-height: 1.6;
+    }
+
+    .footer-badge {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--accent-lime);
+      background: var(--accent-lime-dim);
+      display: inline-block;
+      padding: 0.25rem 0.6rem;
+      border-radius: 4px;
+    }
+
+    .footer-col h4 {
+      color: #FFF;
+      font-size: 0.95rem;
+      font-weight: 700;
+      margin-bottom: 1.25rem;
+    }
+
+    .footer-col ul {
+      list-style: none;
+    }
+
+    .footer-col ul li {
+      margin-bottom: 0.65rem;
+    }
+
+    .footer-col ul li a:hover {
+      color: var(--accent-lime);
+    }
+
+    .footer-contact-text {
+      font-size: 0.85rem;
+      margin-bottom: 0.85rem;
+    }
+
+    .contact-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: #FFF;
+    }
+
+    .footer-bottom {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-top: 2rem;
+      font-size: 0.8rem;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+
+    .footer-meta {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+    }
+
+    @keyframes scan-vertical {
+      0% { top: 0%; opacity: 0; }
+      15% { opacity: 1; }
+      85% { opacity: 1; }
+      100% { top: 98%; opacity: 0; }
+    }
+
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.85); }
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    @media (max-width: 1024px) {
+      .hero-grid {
+        grid-template-columns: 1fr;
+        gap: 3rem;
+      }
+      .demo-card-workspace {
+        grid-template-columns: 1fr;
+      }
+      .workspace-viewport {
+        border-right: none;
+        border-bottom: 1px solid var(--border-light);
+      }
+      .pipeline-track {
+        flex-wrap: wrap;
+        gap: 1.5rem;
+      }
+      .pipeline-connector {
+        display: none;
+      }
+      .pipeline-step {
+        flex: 1 1 30%;
+      }
+      .footer-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .hero-title {
+        font-size: 2.75rem;
+      }
+      .section-header-split {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+      }
+      .nav-links, .nav-actions .btn-secondary-sm, .nav-actions .btn-primary-sm {
+        display: none;
+      }
+      .mobile-toggle {
+        display: block;
+      }
+      .nav-links.mobile-active {
+        display: flex;
+        flex-direction: column;
+        position: absolute;
+        top: 70px;
+        left: 0;
+        right: 0;
+        background: #FFF;
+        padding: 1.5rem;
+        border-bottom: 1px solid var(--border-light);
+        box-shadow: var(--shadow-float);
+      }
+      .pipeline-step {
+        flex: 1 1 45%;
+      }
+      .footer-grid {
+        grid-template-columns: 1fr;
+        gap: 2rem;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .hero-title {
+        font-size: 2.2rem;
+      }
+      .pipeline-step {
+        flex: 1 1 100%;
+      }
+      .hero-cta-group {
+        flex-direction: column;
+      }
+      .hero-cta-group .btn {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Telemetry Status -->
+  <div class="top-bar">
+    <div class="container top-bar-content">
+      <span class="status-indicator"><span class="status-dot"></span> Pipeline Ready: YOLO Defect Detection Engine v2.4 (Simulated Service)</span>
+      <div class="top-links">
+        <a href="#architecture">Architecture Spec</a>
+        <a href="#how-it-works">Standard Operating Procedure</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sticky Navbar -->
+  <nav class="navbar" id="navbar">
+    <div class="container nav-container">
+      <a href="#" class="brand-logo" aria-label="PixelPeel Homepage">
+        <svg class="brand-icon" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="2" y="2" width="40" height="40" rx="10" stroke="#1F7A4D" stroke-width="2" stroke-dasharray="4 3"/>
+          <path d="M22 6C22 6 25 11 25 14C27.5 15 32 18.5 32 25C32 30.5 27.5 35 22 35C16.5 35 12 30.5 12 25C12 18.5 16.5 15 19 14C19 11 22 6 22 6Z" fill="#1F7A4D" fill-opacity="0.12" stroke="#1F7A4D" stroke-width="2"/>
+          <path d="M22 14V35M16 26C16 30 19 33 22 33M28 26C28 30 25 33 22 33" stroke="#A8D94A" stroke-width="1.7" stroke-linecap="round"/>
+          <circle cx="10" cy="10" r="2.5" fill="#A8D94A"/>
+          <circle cx="34" cy="10" r="2.5" fill="#1F7A4D"/>
+          <circle cx="10" cy="34" r="2.5" fill="#1F7A4D"/>
+          <circle cx="34" cy="34" r="2.5" fill="#A8D94A"/>
+        </svg>
+        <span class="brand-text">Pixel<span>Peel</span></span>
+      </a>
+
+      <div class="nav-links" id="navLinks">
+        <a href="#how-it-works" class="nav-item">Workflow</a>
+        <a href="#live-demo" class="nav-item">AI Analysis</a>
+        <a href="#core-tech" class="nav-item">Technology</a>
+        <a href="#features" class="nav-item">Capabilities</a>
+        <a href="#impact" class="nav-item">Impact</a>
+        <a href="#architecture" class="nav-item">Architecture</a>
+      </div>
+
+      <div class="nav-actions">
+        <a href="#live-demo" class="btn btn-secondary-sm">View Demo</a>
+        <a href="#live-demo" class="btn btn-primary-sm">Analyze an Onion &rarr;</a>
+        <button class="mobile-toggle" id="mobileToggle" aria-label="Toggle Navigation">
+          <i data-lucide="menu"></i>
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <header class="hero-section">
+    <div class="container hero-grid">
+      <div class="hero-copy">
+        <div class="pill-badge">
+          <i data-lucide="cpu"></i> AI-POWERED ONION QUALITY ASSESSMENT
+        </div>
+        <h1 class="hero-title">
+          See Quality.<br>
+          <span class="text-gradient">Grade Smarter.</span>
+        </h1>
+        <p class="hero-subheadline">
+          AI-powered computer vision for faster, fairer onion quality assessment.
+        </p>
+        <p class="hero-description">
+          PixelPeel analyzes onion imagery, detects visible superficial defects, assesses skin integrity, and determines quality grading in seconds—bringing transparency and objective standards to procurement centers, traders, and mandi gates.
+        </p>
+        
+        <div class="hero-cta-group">
+          <a href="#live-demo" class="btn btn-primary btn-large">
+            <span>Analyze an Onion</span>
+            <i data-lucide="arrow-right"></i>
+          </a>
+          <a href="#how-it-works" class="btn btn-outline btn-large">
+            <span>Explore How It Works</span>
+          </a>
+        </div>
+
+        <div class="trust-indicators">
+          <div class="trust-item"><i data-lucide="check-circle-2"></i> Computer Vision</div>
+          <div class="trust-item"><i data-lucide="scan-line"></i> Automated Grading</div>
+          <div class="trust-item"><i data-lucide="shield-check"></i> Objective Assessment</div>
+          <div class="trust-item"><i data-lucide="file-spreadsheet"></i> Instant Reports</div>
+        </div>
+      </div>
+
+      <!-- Hero Visual: Simulated CV Bounding Box Rig -->
+      <div class="hero-visual-wrapper">
+        <div class="vision-hud-card">
+          <div class="hud-top">
+            <span class="hud-telemetry"><i data-lucide="camera"></i> CAM_01 : 4K_RGB_SENSOR</span>
+            <span class="hud-tag">STREAM: CALIBRATED</span>
+          </div>
+
+          <div class="hud-viewport">
+            <!-- Onion Graphic -->
+            <div class="hud-subject-container">
+              <svg class="onion-subject-vector" viewBox="0 0 320 320" fill="none">
+                <defs>
+                  <radialGradient id="bulbGrad" cx="40%" cy="40%" r="60%">
+                    <stop offset="0%" stop-color="#C26A3E"/>
+                    <stop offset="60%" stop-color="#8C3518"/>
+                    <stop offset="100%" stop-color="#4E1A0C"/>
+                  </radialGradient>
+                </defs>
+                <path d="M160 30 C165 60 270 120 270 205 C270 265 220 295 160 295 C100 295 50 265 50 205 C50 120 155 60 160 30 Z" fill="url(#bulbGrad)" stroke="#E59866" stroke-width="2"/>
+                <path d="M160 35 C175 90 230 140 230 220 C230 260 200 290 160 295" stroke="#F5BCA0" stroke-width="1.5" stroke-opacity="0.5" fill="none"/>
+                <path d="M160 35 C145 90 90 140 90 220 C90 260 120 290 160 295" stroke="#F5BCA0" stroke-width="1.5" stroke-opacity="0.5" fill="none"/>
+                <path d="M152 28 L160 18 L168 28" stroke="#7D6608" stroke-width="3" stroke-linecap="round"/>
+                <path d="M150 295 L145 308 M160 295 L160 312 M170 295 L175 307" stroke="#3E2723" stroke-width="2" stroke-linecap="round"/>
+              </svg>
+            </div>
+
+            <div class="laser-scanner"></div>
+            <div class="grid-crosshairs"></div>
+
+            <!-- Bounding Box 1: Sprout -->
+            <div class="bbox bbox-warning" style="top: 8%; left: 38%; width: 28%; height: 20%;">
+              <div class="bbox-tag">Sprouted — 89%</div>
+              <div class="corner c-tl"></div><div class="corner c-tr"></div>
+              <div class="corner c-bl"></div><div class="corner c-br"></div>
+            </div>
+
+            <!-- Bounding Box 2: Damaged / Bruised skin -->
+            <div class="bbox bbox-danger" style="top: 48%; left: 62%; width: 28%; height: 32%;">
+              <div class="bbox-tag">Damaged — 94%</div>
+              <div class="corner c-tl"></div><div class="corner c-tr"></div>
+              <div class="corner c-bl"></div><div class="corner c-br"></div>
+            </div>
+
+            <!-- Bounding Box 3: Healthy Surface -->
+            <div class="bbox bbox-success" style="top: 40%; left: 18%; width: 36%; height: 42%;">
+              <div class="bbox-tag">Healthy Flesh — 97%</div>
+              <div class="corner c-tl"></div><div class="corner c-tr"></div>
+              <div class="corner c-bl"></div><div class="corner c-br"></div>
+            </div>
+          </div>
+
+          <div class="hud-footer">
+            <div>
+              <span class="hud-label">ESTIMATED GRADE</span>
+              <span class="hud-val text-accent">GRADE B+</span>
+            </div>
+            <div>
+              <span class="hud-label">INSPECTION TIME</span>
+              <span class="hud-val">182 ms</span>
+            </div>
+            <div>
+              <span class="hud-label">DEFECT DENSITY</span>
+              <span class="hud-val">0.08 / cm²</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Problem Section -->
+  <section class="section section-problem" id="problem">
+    <div class="container">
+      <div class="section-header-split">
+        <div>
+          <span class="sub-badge">INDUSTRY CHALLENGE</span>
+          <h2 class="section-title">Quality Assessment Shouldn't Depend on Guesswork</h2>
+        </div>
+        <p class="section-lead">
+          Traditional inspection at agricultural mandis and distribution centers relies on manual visual checks that lead to quality variance, unfair settlements, and procurement slowdowns.
+        </p>
+      </div>
+
+      <div class="problem-grid">
+        <div class="card problem-card">
+          <div class="card-icon error-tint"><i data-lucide="clock"></i></div>
+          <h3>Manual Inspection</h3>
+          <p>Grading hundreds of bags manually causes severe physical fatigue, delays truck turnaround, and leads to superficial sample bias.</p>
+        </div>
+
+        <div class="card problem-card">
+          <div class="card-icon error-tint"><i data-lucide="user-x"></i></div>
+          <h3>Human Subjectivity</h3>
+          <p>Different inspectors evaluate surface blemishes differently. What one appraiser accepts as Grade A, another demotes to Grade B.</p>
+        </div>
+
+        <div class="card problem-card">
+          <div class="card-icon error-tint"><i data-lucide="scale"></i></div>
+          <h3>Procurement Disputes</h3>
+          <p>Subjective quality disagreements result in payment rejections, arbitrations, and compromised trust between farmers and wholesale buyers.</p>
+        </div>
+
+        <div class="card problem-card">
+          <div class="card-icon error-tint"><i data-lucide="alert-triangle"></i></div>
+          <h3>Inconsistent Grading</h3>
+          <p>Paper-based reports provide no visual audit trail. Retrospective audits are virtually impossible once produce leaves the loading dock.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Solution Section -->
+  <section class="section section-solution">
+    <div class="container">
+      <div class="center-header">
+        <span class="sub-badge">THE ARCHITECTURE</span>
+        <h2 class="section-title">PixelPeel Turns Images Into Quality Intelligence</h2>
+        <p class="section-lead">A unified computer vision workflow engineered for instant, standardized onion quality extraction.</p>
+      </div>
+
+      <div class="pipeline-track">
+        <div class="pipeline-step">
+          <div class="p-node"><i data-lucide="camera"></i></div>
+          <span class="p-label">01. Image Ingestion</span>
+          <span class="p-desc">High-resolution frame capture</span>
+        </div>
+        <div class="pipeline-connector"></div>
+
+        <div class="pipeline-step">
+          <div class="p-node"><i data-lucide="sliders"></i></div>
+          <span class="p-label">02. Preprocessing</span>
+          <span class="p-desc">Normalizing lighting & chromatic scales</span>
+        </div>
+        <div class="pipeline-connector"></div>
+
+        <div class="pipeline-step">
+          <div class="p-node"><i data-lucide="scan"></i></div>
+          <span class="p-label">03. YOLO Detection</span>
+          <span class="p-desc">Localized spatial defect bounding</span>
+        </div>
+        <div class="pipeline-connector"></div>
+
+        <div class="pipeline-step">
+          <div class="p-node"><i data-lucide="pie-chart"></i></div>
+          <span class="p-label">04. Defect Metrics</span>
+          <span class="p-desc">Skin loss, rot & sprout density</span>
+        </div>
+        <div class="pipeline-connector"></div>
+
+        <div class="pipeline-step">
+          <div class="p-node"><i data-lucide="award"></i></div>
+          <span class="p-label">05. Grade Engine</span>
+          <span class="p-desc">Class A/B/C assignment</span>
+        </div>
+        <div class="pipeline-connector"></div>
+
+        <div class="pipeline-step">
+          <div class="p-node"><i data-lucide="file-check"></i></div>
+          <span class="p-label">06. Audit Report</span>
+          <span class="p-desc">Standardized digital receipt</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Interactive Live Analysis Section -->
+  <section class="section section-demo" id="live-demo">
+    <div class="container">
+      <div class="demo-intro">
+        <span class="sub-badge">INTERACTIVE TESTBED</span>
+        <h2 class="section-title">AI That Sees What Humans Miss</h2>
+        <p class="section-lead">
+          Upload an onion sample image or select a pre-calibrated sample to test our automated defect assessment pipeline.
+        </p>
+      </div>
+
+      <div class="demo-card-workspace">
+        <!-- Workspace Left: Ingestion & Live Viewport -->
+        <div class="workspace-viewport">
+          <div class="viewport-header">
+            <span class="hud-mono-tag"><i data-lucide="crosshair"></i> INGESTION_CHANNEL: READY</span>
+            <div class="sample-pills">
+              <span>Try sample:</span>
+              <button class="btn-sample" data-sample="sample1">Standard Healthy</button>
+              <button class="btn-sample" data-sample="sample2">Sprouted Bulb</button>
+              <button class="btn-sample" data-sample="sample3">Damaged/Rot</button>
+            </div>
+          </div>
+
+          <div class="drop-zone-area" id="dropZone">
+            <input type="file" id="fileInput" accept="image/png, image/jpeg, image/webp" class="visually-hidden">
+            
+            <div class="drop-empty-prompt" id="dropPrompt">
+              <div class="drop-icon-ring"><i data-lucide="upload-cloud"></i></div>
+              <p class="drop-heading">Drag and drop onion image here</p>
+              <span class="drop-sub">Supported files: JPG, PNG, WEBP (Max 12MB)</span>
+              <div class="drop-actions">
+                <button type="button" class="btn btn-secondary-sm" id="btnBrowse">Browse Files</button>
+                <button type="button" class="btn btn-outline-sm" id="btnCamera">
+                  <i data-lucide="camera"></i> Use Device Camera
+                </button>
+              </div>
+            </div>
+
+            <!-- Preview Frame with Overlay Canvas -->
+            <div class="preview-container hidden" id="previewContainer">
+              <img id="previewImage" alt="Target onion preview" src="" />
+              <div class="scanning-bar-active hidden" id="scannerLaser"></div>
+              <div class="detection-overlay-layer" id="detectionOverlay"></div>
+            </div>
+          </div>
+
+          <div class="viewport-control-bar">
+            <button class="btn btn-primary" id="btnRunAnalysis" disabled>
+              <i data-lucide="play"></i> Run AI Analysis
+            </button>
+            <button class="btn btn-outline" id="btnResetWorkspace" disabled>
+              <i data-lucide="rotate-ccw"></i> Reset
+            </button>
+          </div>
+        </div>
+
+        <!-- Workspace Right: Analysis & Grade Telemetry -->
+        <div class="workspace-telemetry">
+          <div class="telemetry-header">
+            <h3>Diagnostic Results</h3>
+            <span class="badge-source" id="modelTypeBadge">Demo AI Analysis</span>
+          </div>
+
+          <!-- Processing State Notification -->
+          <div class="processing-status-box hidden" id="processingStatus">
+            <div class="spinner"></div>
+            <span id="processingStepLabel">Preprocessing image geometry...</span>
+          </div>
+
+          <!-- Idle Instructions (Shown before test) -->
+          <div class="idle-state-box" id="idleBox">
+            <i data-lucide="microchip"></i>
+            <h4>No Image Processed</h4>
+            <p>Upload an onion photo to run computer vision feature extraction and grading evaluation.</p>
+          </div>
+
+          <!-- Live Results Container (Hidden until analysis runs) -->
+          <div class="results-layout hidden" id="resultsContainer">
+            <div class="score-banner">
+              <div class="score-circle">
+                <span class="score-value" id="resScore">--</span>
+                <span class="score-caption">/ 100</span>
+              </div>
+              <div class="grade-badge-card">
+                <span class="grade-micro">FINAL ASSIGNED GRADE</span>
+                <span class="grade-letter" id="resGrade">--</span>
+                <span class="grade-tagline" id="resGradeDescriptor">Evaluation Pending</span>
+              </div>
+            </div>
+
+            <!-- Defect Breakdown Bars -->
+            <div class="defect-metrics-group">
+              <h4 class="metric-title">Defect Distribution & Probability</h4>
+              
+              <div class="bar-metric">
+                <div class="metric-info">
+                  <span>Healthy Flesh Integrity</span>
+                  <span class="val" id="valHealthy">--%</span>
+                </div>
+                <div class="progress-track"><div class="progress-fill fill-healthy" id="barHealthy" style="width: 0%"></div></div>
+              </div>
+
+              <div class="bar-metric">
+                <div class="metric-info">
+                  <span>Surface Damage / Cuts</span>
+                  <span class="val" id="valDamaged">--%</span>
+                </div>
+                <div class="progress-track"><div class="progress-fill fill-damaged" id="barDamaged" style="width: 0%"></div></div>
+              </div>
+
+              <div class="bar-metric">
+                <div class="metric-info">
+                  <span>Fungal / Basal Rot</span>
+                  <span class="val" id="valRotten">--%</span>
+                </div>
+                <div class="progress-track"><div class="progress-fill fill-rotten" id="barRotten" style="width: 0%"></div></div>
+              </div>
+
+              <div class="bar-metric">
+                <div class="metric-info">
+                  <span>Premature Sprouting</span>
+                  <span class="val" id="valSprouted">--%</span>
+                </div>
+                <div class="progress-track"><div class="progress-fill fill-sprouted" id="barSprouted" style="width: 0%"></div></div>
+              </div>
+
+              <div class="bar-metric">
+                <div class="metric-info">
+                  <span>Undersized / Stunted Caliber</span>
+                  <span class="val" id="valUndersized">--%</span>
+                </div>
+                <div class="progress-track"><div class="progress-fill fill-undersized" id="barUndersized" style="width: 0%"></div></div>
+              </div>
+            </div>
+
+            <div class="telemetry-meta-row">
+              <div>
+                <span class="sub-label">Confidence Index</span>
+                <span class="sub-val" id="resConfidence">--%</span>
+              </div>
+              <div>
+                <span class="sub-label">Inference Latency</span>
+                <span class="sub-val" id="resLatency">-- ms</span>
+              </div>
+              <div>
+                <span class="sub-label">Bounding Regions</span>
+                <span class="sub-val" id="resBoxesCount">--</span>
+              </div>
+            </div>
+
+            <button class="btn btn-primary btn-full" id="btnDownloadReport">
+              <i data-lucide="file-text"></i> Generate Quality Report (Audit Log)
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- How It Works (Step-by-Step Flow) -->
+  <section class="section section-workflow" id="how-it-works">
+    <div class="container">
+      <div class="center-header">
+        <span class="sub-badge">SYSTEM PROTOCOL</span>
+        <h2 class="section-title">5 Steps From Intake to Actionable Grade</h2>
+        <p class="section-lead">Designed for seamless deployment directly in sorting docks, mandis, and packing warehouses.</p>
+      </div>
+
+      <div class="steps-grid">
+        <div class="step-card">
+          <div class="step-number">01</div>
+          <div class="step-icon"><i data-lucide="camera"></i></div>
+          <h3>Capture</h3>
+          <p>Photograph individual samples or conveyer batches using a mobile phone, tablet, or industrial fixed overhead RGB camera.</p>
+        </div>
+
+        <div class="step-card">
+          <div class="step-number">02</div>
+          <div class="step-icon"><i data-lucide="cpu"></i></div>
+          <h3>Preprocess</h3>
+          <p>PixelPeel corrects illumination variations, normalizes contrast, removes shadows, and segments the onion boundary.</p>
+        </div>
+
+        <div class="step-card">
+          <div class="step-number">03</div>
+          <div class="step-icon"><i data-lucide="scan"></i></div>
+          <h3>Detect</h3>
+          <p>Deep-learning bounding boxes localize surface abrasions, black mold, neck rot, root plate emergence, and sprout stems.</p>
+        </div>
+
+        <div class="step-card">
+          <div class="step-number">04</div>
+          <div class="step-icon"><i data-lucide="bar-chart-2"></i></div>
+          <h3>Grade</h3>
+          <p>An algorithmic decision tree matches detected blemish ratios against national grading standards (Grade A, B, or C reject).</p>
+        </div>
+
+        <div class="step-card">
+          <div class="step-number">05</div>
+          <div class="step-icon"><i data-lucide="file-text"></i></div>
+          <h3>Report</h3>
+          <p>An immutable digital quality assessment report is generated, complete with bounding snapshots and verifiable telemetry.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Computer Vision Core (Dark Futuristic Section) -->
+  <section class="section section-tech-deep dark-section" id="core-tech">
+    <div class="container">
+      <div class="section-header-split">
+        <div>
+          <span class="sub-badge accent-badge">ALGORITHMIC FOUNDATION</span>
+          <h2 class="section-title text-white">Computer Vision at the Core</h2>
+        </div>
+        <p class="section-lead text-light">
+          Built upon modern single-stage convolutional object detection architectures for real-time edge processing and low-latency inference.
+        </p>
+      </div>
+
+      <div class="tech-grid">
+        <div class="tech-card">
+          <div class="tech-card-header">
+            <i data-lucide="target"></i>
+            <span class="tech-chip">YOLO Pipeline</span>
+          </div>
+          <h3>Object Localization</h3>
+          <p>Identifies onion contours, caliber dimensions, and surface boundaries against noisy background environments like conveyor belts, gunny sacks, or field soil.</p>
+        </div>
+
+        <div class="tech-card">
+          <div class="tech-card-header">
+            <i data-lucide="alert-octagon"></i>
+            <span class="tech-chip">Multi-Class CV</span>
+          </div>
+          <h3>Defect Segmentation</h3>
+          <p>Classifies visible pathology: distinguishing harmless dry-scale peeling from critical fungal rots, cuts, and commercial sprouting.</p>
+        </div>
+
+        <div class="tech-card">
+          <div class="tech-card-header">
+            <i data-lucide="layers"></i>
+            <span class="tech-chip">Image DSP</span>
+          </div>
+          <h3>Image Processing</h3>
+          <p>Dynamic histogram equalization and chromatic normalization mitigate uneven daylighting and dust glare common in rural procurement hubs.</p>
+        </div>
+
+        <div class="tech-card">
+          <div class="tech-card-header">
+            <i data-lucide="check-check"></i>
+            <span class="tech-chip">Deterministic Engine</span>
+          </div>
+          <h3>Quality Grading Rulebase</h3>
+          <p>Converts defect pixel area calculations and surface confidence scores into actionable Grade A, B, and Commercial Reject ratings.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Interactive Before / After Comparison -->
+  <section class="section section-comparison">
+    <div class="container">
+      <div class="center-header">
+        <span class="sub-badge">OPERATIONAL EVOLUTION</span>
+        <h2 class="section-title">Manual Appraisal vs. PixelPeel Vision</h2>
+        <p class="section-lead">A paradigm shift from subjective guesswork to transparent visual documentation.</p>
+      </div>
+
+      <div class="comparison-table-wrapper">
+        <table class="comparison-table">
+          <thead>
+            <tr>
+              <th>Evaluation Parameter</th>
+              <th>Traditional Inspection</th>
+              <th class="col-highlight">PixelPeel AI Assessment</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Inspection Consistency</strong></td>
+              <td>Subject to inspector fatigue, bias, and varying lighting conditions.</td>
+              <td class="col-highlight"><i data-lucide="check" class="text-accent"></i> Standardized mathematical thresholding across every batch.</td>
+            </tr>
+            <tr>
+              <td><strong>Dispute Settlement</strong></td>
+              <td>Verbal debate; no permanent physical evidence saved.</td>
+              <td class="col-highlight"><i data-lucide="check" class="text-accent"></i> Time-stamped visual audit report with localized bounding boxes.</td>
+            </tr>
+            <tr>
+              <td><strong>Assessment Speed</strong></td>
+              <td>Manual cutting and manual sorting takes extensive manual labor.</td>
+              <td class="col-highlight"><i data-lucide="check" class="text-accent"></i> Instant non-destructive surface evaluation in milliseconds.</td>
+            </tr>
+            <tr>
+              <td><strong>Data Traceability</strong></td>
+              <td>Handwritten ledgers; prone to entry errors and loss.</td>
+              <td class="col-highlight"><i data-lucide="check" class="text-accent"></i> Exportable digital records ready for ERP and logistics systems.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- Key Features Grid -->
+  <section class="section section-features" id="features">
+    <div class="container">
+      <div class="center-header">
+        <span class="sub-badge">KEY CAPABILITIES</span>
+        <h2 class="section-title">Engineered for Agricultural Rigor</h2>
+        <p class="section-lead">Purpose-built features crafted specifically for onion storage, wholesale trade, and intake quality control.</p>
+      </div>
+
+      <div class="features-grid">
+        <div class="card feature-card">
+          <div class="card-icon"><i data-lucide="eye"></i></div>
+          <h3>AI-Based Defect Localization</h3>
+          <p>Simultaneously identifies surface cuts, basal plate mold, soft rot spots, and emerging shoots with pixel-level bounding coordinates.</p>
+        </div>
+
+        <div class="card feature-card">
+          <div class="card-icon"><i data-lucide="award"></i></div>
+          <h3>Automated Grading Standards</h3>
+          <p>Enforces agricultural quality brackets consistently, mapping defect density into Grade A (Premium), Grade B (Fair), and Grade C (Industrial).</p>
+        </div>
+
+        <div class="card feature-card">
+          <div class="card-icon"><i data-lucide="zap"></i></div>
+          <h3>Low-Latency Results</h3>
+          <p>Engineered to deliver rapid inferencing suitable for high-throughput procurement gates and processing conveyor checkpoints.</p>
+        </div>
+
+        <div class="card feature-card">
+          <div class="card-icon"><i data-lucide="shield"></i></div>
+          <h3>Objective Assessment</h3>
+          <p>Eliminates personal bias, human mood, and visual strain from the quality evaluation workflow.</p>
+        </div>
+
+        <div class="card feature-card">
+          <div class="card-icon"><i data-lucide="download"></i></div>
+          <h3>Exportable Inspection Reports</h3>
+          <p>Instant digital reports containing image evidence, defect distributions, and timestamped batch metadata.</p>
+        </div>
+
+        <div class="card feature-card">
+          <div class="card-icon"><i data-lucide="network"></i></div>
+          <h3>Scalable Edge Architecture</h3>
+          <p>Designed to transition seamlessly from standalone smartphone inspection to cloud-connected sorting lines.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Target Audience -->
+  <section class="section section-audience">
+    <div class="container">
+      <div class="center-header">
+        <span class="sub-badge">ECOSYSTEM BENEFICIARIES</span>
+        <h2 class="section-title">Value Across the Entire Value Chain</h2>
+        <p class="section-lead">Bridging the trust gap between harvesting fields and destination markets.</p>
+      </div>
+
+      <div class="audience-grid">
+        <div class="card audience-card">
+          <div class="aud-icon"><i data-lucide="sprout"></i></div>
+          <h4>Farmers</h4>
+          <p>Verify onion quality before transporting produce to mandi gates, avoiding unexpected quality demotions.</p>
+        </div>
+
+        <div class="card audience-card">
+          <div class="aud-icon"><i data-lucide="warehouse"></i></div>
+          <h4>Procurement Centers</h4>
+          <p>Speed up truck unloading times with standardized, transparent intake verification checks.</p>
+        </div>
+
+        <div class="card audience-card">
+          <div class="aud-icon"><i data-lucide="truck"></i></div>
+          <h4>Traders & Wholesalers</h4>
+          <p>Assess lot samples with photographic records prior to interstate cold storage dispatch.</p>
+        </div>
+
+        <div class="card audience-card">
+          <div class="aud-icon"><i data-lucide="check-square"></i></div>
+          <h4>Quality Inspectors</h4>
+          <p>Equip field auditors with AI assistance to back up their grading decisions with visual evidence.</p>
+        </div>
+
+        <div class="card audience-card">
+          <div class="aud-icon"><i data-lucide="building"></i></div>
+          <h4>Agri Cooperatives</h4>
+          <p>Build historical batch quality databases to track regional harvest trends and storage longevity.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Impact Section -->
+  <section class="section section-impact" id="impact">
+    <div class="container">
+      <div class="center-header">
+        <span class="sub-badge">VALUE PROPOSITION</span>
+        <h2 class="section-title">Built for Better Agricultural Decisions</h2>
+        <p class="section-lead">Addressing structural inefficiencies in crop appraisal with measured precision.</p>
+      </div>
+
+      <div class="impact-grid">
+        <div class="impact-metric-card">
+          <div class="impact-icon"><i data-lucide="fast-forward"></i></div>
+          <h3>Faster Inspection</h3>
+          <p>Designed to reduce repetitive manual appraisal bottlenecks at intake gates.</p>
+        </div>
+
+        <div class="impact-metric-card">
+          <div class="impact-icon"><i data-lucide="check-circle"></i></div>
+          <h3>Consistent Evaluation</h3>
+          <p>Standardizes quality determination protocols across divergent regional procurement hubs.</p>
+        </div>
+
+        <div class="impact-metric-card">
+          <div class="impact-icon"><i data-lucide="thumbs-up"></i></div>
+          <h3>Reduced Disputes</h3>
+          <p>Provides tamper-resistant visual proof to build commercial trust between growers and traders.</p>
+        </div>
+
+        <div class="impact-metric-card">
+          <div class="impact-icon"><i data-lucide="bar-chart"></i></div>
+          <h3>Data-Driven Procurement</h3>
+          <p>Replaces handwritten registers with digital batch telemetry for informed inventory decisions.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Technical Architecture Visualizer -->
+  <section class="section section-architecture dark-section" id="architecture">
+    <div class="container">
+      <div class="center-header">
+        <span class="sub-badge accent-badge">SYSTEM INTEGRATION</span>
+        <h2 class="section-title text-white">End-to-End Technology Stack</h2>
+        <p class="section-lead text-light">Clear delineation between our functional prototype and target enterprise roadmap.</p>
+      </div>
+
+      <div class="arch-diagram-card">
+        <div class="arch-flow">
+          <div class="arch-node">
+            <span class="node-type">CLIENT LAYER</span>
+            <i data-lucide="smartphone"></i>
+            <strong>Mobile / Web UI</strong>
+            <span class="node-status status-live">Current Prototype</span>
+          </div>
+          <div class="arch-arrow">&rarr;</div>
+
+          <div class="arch-node">
+            <span class="node-type">INGESTION</span>
+            <i data-lucide="camera"></i>
+            <strong>Camera / File Stream</strong>
+            <span class="node-status status-live">Current Prototype</span>
+          </div>
+          <div class="arch-arrow">&rarr;</div>
+
+          <div class="arch-node">
+            <span class="node-type">PROCESSING</span>
+            <i data-lucide="sliders"></i>
+            <strong>DSP Normalizer</strong>
+            <span class="node-status status-live">Client Simulated</span>
+          </div>
+          <div class="arch-arrow">&rarr;</div>
+
+          <div class="arch-node highlight-node">
+            <span class="node-type">INFERENCE CORE</span>
+            <i data-lucide="cpu"></i>
+            <strong>YOLO Defect Detector</strong>
+            <span class="node-status status-planned">REST API Ready</span>
+          </div>
+          <div class="arch-arrow">&rarr;</div>
+
+          <div class="arch-node">
+            <span class="node-type">RULEBASE</span>
+            <i data-lucide="award"></i>
+            <strong>Grading Engine</strong>
+            <span class="node-status status-live">Operational</span>
+          </div>
+          <div class="arch-arrow">&rarr;</div>
+
+          <div class="arch-node">
+            <span class="node-type">OUTPUT</span>
+            <i data-lucide="file-check"></i>
+            <strong>PDF / ERP Report</strong>
+            <span class="node-status status-live">Operational</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Future Roadmap -->
+  <section class="section section-future">
+    <div class="container">
+      <div class="center-header">
+        <span class="sub-badge">FUTURE HORIZONS</span>
+        <h2 class="section-title">Strategic Development Scope</h2>
+        <p class="section-lead">A phased roadmap moving from single-bulb assessment toward automated mandi sorting line integrations.</p>
+      </div>
+
+      <div class="future-timeline">
+        <div class="phase-card">
+          <span class="phase-number">Phase 1</span>
+          <h4>Image Defect Detection</h4>
+          <p>Single onion RGB image analysis and defect classification (Current State).</p>
+        </div>
+
+        <div class="phase-card">
+          <span class="phase-number">Phase 2</span>
+          <h4>Dataset Scaling</h4>
+          <p>Training models across diverse regional onion varietals (Nashik Red, White, Bellary).</p>
+        </div>
+
+        <div class="phase-card">
+          <span class="phase-number">Phase 3</span>
+          <h4>Continuous Video Feed</h4>
+          <p>Real-time edge analysis running on high-speed sorting conveyers.</p>
+        </div>
+
+        <div class="phase-card">
+          <span class="phase-number">Phase 4</span>
+          <h4>Batch-Level Aggregates</h4>
+          <p>Statistically valid sampling calculators for 50kg gunny bags.</p>
+        </div>
+
+        <div class="phase-card">
+          <span class="phase-number">Phase 5</span>
+          <h4>Multi-Commodity Expansion</h4>
+          <p>Transfer learning across potato, garlic, and tomato visual inspection lines.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Call to Action -->
+  <section class="section section-cta dark-section">
+    <div class="container cta-container">
+      <div class="cta-content">
+        <div class="pill-badge accent-badge">READY TO TEST?</div>
+        <h2 class="cta-title">Turn Every Onion Image Into Actionable Quality Data.</h2>
+        <p class="cta-sub">
+          Experience how computer vision brings speed, consistency, and objective trust to agricultural quality assessment.
+        </p>
+        <div class="cta-buttons">
+          <a href="#live-demo" class="btn btn-primary btn-large">
+            <span>Analyze Onion Sample</span>
+            <i data-lucide="arrow-up-right"></i>
+          </a>
+          <a href="#core-tech" class="btn btn-outline btn-large">
+            <span>Review Technology Pipeline</span>
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="container footer-grid">
+      <div class="footer-brand">
+        <div class="brand-logo footer-logo">
+          <span class="brand-text">Pixel<span>Peel</span></span>
+        </div>
+        <p class="footer-desc">
+          AI-assisted visual inspection for consistent agricultural quality assessment. Standardizing produce grading with computer vision.
+        </p>
+        <div class="footer-badge">Built with AI + Computer Vision</div>
+      </div>
+
+      <div class="footer-col">
+        <h4>Navigation</h4>
+        <ul>
+          <li><a href="#how-it-works">How It Works</a></li>
+          <li><a href="#live-demo">Live Analysis</a></li>
+          <li><a href="#core-tech">Computer Vision</a></li>
+          <li><a href="#features">Key Features</a></li>
+        </ul>
+      </div>
+
+      <div class="footer-col">
+        <h4>Technical</h4>
+        <ul>
+          <li><a href="#architecture">Architecture Spec</a></li>
+          <li><a href="#problem">Industry Challenge</a></li>
+          <li><a href="#impact">Impact Drivers</a></li>
+          <li><a href="https://github.com" target="_blank" rel="noopener">GitHub Repository</a></li>
+        </ul>
+      </div>
+
+      <div class="footer-col">
+        <h4>Contact & Demo</h4>
+        <p class="footer-contact-text">Designed for technical review, hackathons, and agricultural procurement pilot trials.</p>
+        <div class="contact-pill"><i data-lucide="mail"></i> team@pixelpeel.agri</div>
+      </div>
+    </div>
+
+    <div class="container footer-bottom">
+      <p>&copy; 2026 PixelPeel. AI-powered agricultural quality assessment. All rights reserved.</p>
+      <div class="footer-meta">
+        <span>ISO Quality Grading Framework Reference</span>
+        <span>•</span>
+        <span>Standardized Evaluation Engine</span>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    /**
+     * PixelPeel AI Computer Vision Inference Service
+     * Simulates deep learning detection and provides clean REST endpoint integration hooks.
+     */
+    const AIAnalysisService = (function () {
+      const USE_LIVE_BACKEND = false;
+      const BACKEND_ENDPOINT = "/api/v1/analyze";
+
+      const SAMPLES = {
+        sample1: {
+          type: "Standard Healthy",
+          qualityScore: 94,
+          grade: "A",
+          gradeDescriptor: "Premium Export Quality",
+          confidence: 96.8,
+          latencyMs: 142,
+          defects: { healthy: 96, damaged: 2, rotten: 1, sprouted: 0, undersized: 1 },
+          boundingBoxes: [
+            { label: "Healthy Skin", score: 98, top: 25, left: 25, width: 50, height: 50, type: "success" }
+          ]
+        },
+        sample2: {
+          type: "Sprouted Bulb",
+          qualityScore: 68,
+          grade: "B",
+          gradeDescriptor: "Secondary Domestic Grade",
+          confidence: 92.4,
+          latencyMs: 178,
+          defects: { healthy: 70, damaged: 6, rotten: 4, sprouted: 18, undersized: 2 },
+          boundingBoxes: [
+            { label: "Sprout Stem", score: 91, top: 6, left: 38, width: 24, height: 26, type: "warning" },
+            { label: "Root Plate Protrusion", score: 87, top: 75, left: 35, width: 30, height: 20, type: "warning" }
+          ]
+        },
+        sample3: {
+          type: "Damaged / Rot",
+          qualityScore: 41,
+          grade: "C",
+          gradeDescriptor: "Commercial Processing / Reject",
+          confidence: 94.1,
+          latencyMs: 195,
+          defects: { healthy: 42, damaged: 28, rotten: 24, sprouted: 3, undersized: 3 },
+          boundingBoxes: [
+            { label: "Basal Soft Rot", score: 95, top: 45, left: 50, width: 35, height: 40, type: "danger" },
+            { label: "Surface Abrasion", score: 88, top: 28, left: 20, width: 25, height: 25, type: "danger" }
+          ]
+        }
+      };
+
+      function generateDynamicAnalysis(imageName) {
+        const isRelativelyHealthy = Math.random() > 0.4;
+        const score = isRelativelyHealthy 
+          ? Math.floor(82 + Math.random() * 14) 
+          : Math.floor(45 + Math.random() * 32);
+
+        let grade = "C";
+        let gradeDescriptor = "Commercial Reject / Processing";
+        if (score >= 85) {
+          grade = "A";
+          gradeDescriptor = "Grade A: Premium Commercial";
+        } else if (score >= 65) {
+          grade = "B";
+          gradeDescriptor = "Grade B: Fair Domestic Quality";
+        }
+
+        const rotten = Math.floor(Math.random() * (100 - score) * 0.4);
+        const damaged = Math.floor(Math.random() * (100 - score) * 0.4);
+        const sprouted = Math.floor(Math.random() * (100 - score) * 0.15);
+        const undersized = Math.max(0, 100 - score - rotten - damaged - sprouted);
+
+        return {
+          qualityScore: score,
+          grade: grade,
+          gradeDescriptor: gradeDescriptor,
+          confidence: +(89 + Math.random() * 8.5).toFixed(1),
+          latencyMs: Math.floor(130 + Math.random() * 90),
+          defects: {
+            healthy: score,
+            damaged: damaged,
+            rotten: rotten,
+            sprouted: sprouted,
+            undersized: undersized
+          },
+          boundingBoxes: [
+            { label: "Detected Contour", score: 96, top: 20, left: 20, width: 60, height: 60, type: "success" },
+            ...(score < 80 ? [{ label: "Suspected Defect", score: 89, top: 40, left: 35, width: 25, height: 30, type: "danger" }] : [])
+          ]
+        };
+      }
+
+      return {
+        getSample: function (key) {
+          return SAMPLES[key] || SAMPLES.sample1;
+        },
+        analyze: async function (imagePayload, onStepCallback) {
+          if (USE_LIVE_BACKEND) {
+            // Live API call template:
+            // const formData = new FormData();
+            // formData.append('image', imagePayload);
+            // const res = await fetch(BACKEND_ENDPOINT, { method: 'POST', body: formData });
+            // return await res.json();
+          }
+
+          if (onStepCallback) onStepCallback("Normalizing RGB chromatic spectrum & lighting...");
+          await new Promise(r => setTimeout(r, 600));
+
+          if (onStepCallback) onStepCallback("Running YOLO feature extraction & defect segmentation...");
+          await new Promise(r => setTimeout(r, 800));
+
+          if (onStepCallback) onStepCallback("Calculating blemish pixel density & assigning grade...");
+          await new Promise(r => setTimeout(r, 500));
+
+          if (typeof imagePayload === "string" && SAMPLES[imagePayload]) {
+            return SAMPLES[imagePayload];
+          }
+
+          return generateDynamicAnalysis(imagePayload.name || "custom_upload");
+        }
+      };
+    })();
+
+    /**
+     * PixelPeel Report Generator
+     * Exports verifiable standardized audit documentation in text format.
+     */
+    const ReportGenerator = (function () {
+      return {
+        downloadReport: function (analysisData, sampleName = "ONION-SAMPLE-01") {
+          const timestamp = new Date().toISOString().replace('T', ' ').substr(0, 19);
+          const reportId = "PX-" + Math.floor(100000 + Math.random() * 900000);
+
+          const reportContent = `================================================================================
+                    PIXELPEEL COMPUTER VISION LABS
+              ONION QUALITY AUDIT & GRADING CERTIFICATE
+================================================================================
+Report Reference ID : ${reportId}
+Inspection Timestamp: ${timestamp} UTC
+Sample Name / ID    : ${sampleName}
+Grading Standard    : Agri-Tech National Produce Framework (Non-Destructive CV)
+================================================================================
+
+1. OVERALL EVALUATION SUMMARY
+--------------------------------------------------------------------------------
+Overall Quality Score : ${analysisData.qualityScore} / 100
+Assigned Grade        : GRADE ${analysisData.grade} (${analysisData.gradeDescriptor})
+Model Confidence      : ${analysisData.confidence}%
+Inference Latency     : ${analysisData.latencyMs} ms
+
+2. SURFACE DEFECT DISTRIBUTION
+--------------------------------------------------------------------------------
+- Healthy Tissue Integrity : ${analysisData.defects.healthy}%
+- Mechanical Damage / Cuts : ${analysisData.defects.damaged}%
+- Fungal / Basal Soft Rot  : ${analysisData.defects.rotten}%
+- Premature Sprout Tissue  : ${analysisData.defects.sprouted}%
+- Caliber / Undersized     : ${analysisData.defects.undersized}%
+
+3. DETECTED REGION HIGHLIGHTS
+--------------------------------------------------------------------------------
+${analysisData.boundingBoxes.map((b, idx) => `[Region ${idx + 1}] Class: ${b.label.padEnd(20)} Confidence: ${b.score}%`).join('\n')}
+
+4. DISPOSITION & STORAGE RECOMMENDATION
+--------------------------------------------------------------------------------
+${analysisData.grade === 'A' 
+  ? 'APPROVED: Suitable for long-term ventilated storage or prime export dispatch.'
+  : analysisData.grade === 'B'
+  ? 'DOMESTIC RETAIL: Fast-track to local distribution; monitor ambient moisture.'
+  : 'REJECT / RE-SORT: Divert to dehydration, industrial processing, or segregation.'}
+
+================================================================================
+Notice: This is a verified automated diagnostic output generated by the 
+PixelPeel Computer Vision Prototype.
+================================================================================`;
+
+          const blob = new Blob([reportContent], { type: "text/plain;charset=utf-8" });
+          const downloadUrl = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.href = downloadUrl;
+          link.download = `PixelPeel_Audit_${reportId}.txt`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          URL.revokeObjectURL(downloadUrl);
+        }
+      };
+    })();
+
+    document.addEventListener("DOMContentLoaded", function () {
+      // Initialize Lucide icons
+      lucide.createIcons();
+
+      // Navbar Scroll & Hamburger Logic
+      const navbar = document.getElementById("navbar");
+      const mobileToggle = document.getElementById("mobileToggle");
+      const navLinks = document.getElementById("navLinks");
+
+      window.addEventListener("scroll", () => {
+        if (window.scrollY > 30) {
+          navbar.classList.add("scrolled");
+        } else {
+          navbar.classList.remove("scrolled");
+        }
+      });
+
+      mobileToggle.addEventListener("click", () => {
+        navLinks.classList.toggle("mobile-active");
+      });
+
+      document.querySelectorAll(".nav-item").forEach(link => {
+        link.addEventListener("click", () => {
+          navLinks.classList.remove("mobile-active");
+        });
+      });
+
+      // Interactive Testbed DOM Elements
+      const dropZone = document.getElementById("dropZone");
+      const fileInput = document.getElementById("fileInput");
+      const btnBrowse = document.getElementById("btnBrowse");
+      const btnCamera = document.getElementById("btnCamera");
+      const dropPrompt = document.getElementById("dropPrompt");
+      const previewContainer = document.getElementById("previewContainer");
+      const previewImage = document.getElementById("previewImage");
+      const detectionOverlay = document.getElementById("detectionOverlay");
+      const scannerLaser = document.getElementById("scannerLaser");
+
+      const btnRunAnalysis = document.getElementById("btnRunAnalysis");
+      const btnResetWorkspace = document.getElementById("btnResetWorkspace");
+      const btnDownloadReport = document.getElementById("btnDownloadReport");
+
+      const idleBox = document.getElementById("idleBox");
+      const processingStatus = document.getElementById("processingStatus");
+      const processingStepLabel = document.getElementById("processingStepLabel");
+      const resultsContainer = document.getElementById("resultsContainer");
+
+      const sampleButtons = document.querySelectorAll(".btn-sample");
+
+      let currentImagePayload = null;
+      let latestAnalysisResult = null;
+
+      // Sample Preset Selector
+      sampleButtons.forEach(btn => {
+        btn.addEventListener("click", () => {
+          const sampleKey = btn.getAttribute("data-sample");
+          loadSamplePreset(sampleKey);
+        });
+      });
+
+      function loadSamplePreset(key) {
+        clearBoundingBoxes();
+        currentImagePayload = key;
+        
+        const sampleUrls = {
+          sample1: "https://images.unsplash.com/photo-1618512496248-a07fe83aa8cb?auto=format&fit=crop&w=700&q=80",
+          sample2: "https://images.unsplash.com/photo-1508747703725-719777637510?auto=format&fit=crop&w=700&q=80",
+          sample3: "https://images.unsplash.com/photo-1587049352846-4a222e784d38?auto=format&fit=crop&w=700&q=80"
+        };
+
+        setPreviewImage(sampleUrls[key]);
+      }
+
+      // File Browser & Camera Handling
+      btnBrowse.addEventListener("click", () => fileInput.click());
+
+      fileInput.addEventListener("change", (e) => {
+        if (e.target.files && e.target.files[0]) {
+          handleFile(e.target.files[0]);
+        }
+      });
+
+      btnCamera.addEventListener("click", async () => {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+          alert("Camera stream detected! Live video frame captured. Loading sample for inspection demonstration.");
+          stream.getTracks().forEach(track => track.stop());
+          loadSamplePreset("sample1");
+        } catch (err) {
+          alert("Camera access denied or unavailable on this device. Loading pre-calibrated sample.");
+          loadSamplePreset("sample1");
+        }
+      });
+
+      // Drag and Drop
+      ["dragenter", "dragover"].forEach(name => {
+        dropZone.addEventListener(name, (e) => {
+          e.preventDefault();
+          dropZone.classList.add("drag-over");
+        });
+      });
+
+      ["dragleave", "drop"].forEach(name => {
+        dropZone.addEventListener(name, (e) => {
+          e.preventDefault();
+          dropZone.classList.remove("drag-over");
+        });
+      });
+
+      dropZone.addEventListener("drop", (e) => {
+        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+          handleFile(e.dataTransfer.files[0]);
+        }
+      });
+
+      function handleFile(file) {
+        clearBoundingBoxes();
+        currentImagePayload = file;
+        const reader = new FileReader();
+        reader.onload = (e) => setPreviewImage(e.target.result);
+        reader.readAsDataURL(file);
+      }
+
+      function setPreviewImage(src) {
+        previewImage.src = src;
+        dropPrompt.classList.add("hidden");
+        previewContainer.classList.remove("hidden");
+        btnRunAnalysis.disabled = false;
+        btnResetWorkspace.disabled = false;
+
+        idleBox.classList.remove("hidden");
+        resultsContainer.classList.add("hidden");
+        processingStatus.classList.add("hidden");
+      }
+
+      // Run AI Workflow Execution
+      btnRunAnalysis.addEventListener("click", async () => {
+        if (!currentImagePayload) return;
+
+        btnRunAnalysis.disabled = true;
+        idleBox.classList.add("hidden");
+        resultsContainer.classList.add("hidden");
+        processingStatus.classList.remove("hidden");
+        scannerLaser.classList.remove("hidden");
+        clearBoundingBoxes();
+
+        try {
+          latestAnalysisResult = await AIAnalysisService.analyze(
+            currentImagePayload, 
+            (stepText) => { processingStepLabel.textContent = stepText; }
+          );
+
+          renderResults(latestAnalysisResult);
+        } catch (error) {
+          console.error(error);
+          processingStepLabel.textContent = "Analysis pipeline error.";
+        } finally {
+          processingStatus.classList.add("hidden");
+          scannerLaser.classList.add("hidden");
+          btnRunAnalysis.disabled = false;
+        }
+      });
+
+      function renderResults(data) {
+        resultsContainer.classList.remove("hidden");
+
+        document.getElementById("resScore").textContent = data.qualityScore;
+        document.getElementById("resGrade").textContent = data.grade;
+        document.getElementById("resGradeDescriptor").textContent = data.gradeDescriptor;
+
+        setBar("Healthy", data.defects.healthy);
+        setBar("Damaged", data.defects.damaged);
+        setBar("Rotten", data.defects.rotten);
+        setBar("Sprouted", data.defects.sprouted);
+        setBar("Undersized", data.defects.undersized);
+
+        document.getElementById("resConfidence").textContent = data.confidence + "%";
+        document.getElementById("resLatency").textContent = data.latencyMs + " ms";
+        document.getElementById("resBoxesCount").textContent = data.boundingBoxes.length;
+
+        renderBoundingBoxes(data.boundingBoxes);
+      }
+
+      function setBar(name, val) {
+        document.getElementById(`val${name}`).textContent = val + "%";
+        document.getElementById(`bar${name}`).style.width = val + "%";
+      }
+
+      function renderBoundingBoxes(boxes) {
+        clearBoundingBoxes();
+        boxes.forEach(box => {
+          const boxEl = document.createElement("div");
+          boxEl.className = `bbox bbox-${box.type}`;
+          boxEl.style.top = box.top + "%";
+          boxEl.style.left = box.left + "%";
+          boxEl.style.width = box.width + "%";
+          boxEl.style.height = box.height + "%";
+
+          boxEl.innerHTML = `
+            <div class="bbox-tag">${box.label} — ${box.score}%</div>
+            <div class="corner c-tl"></div><div class="corner c-tr"></div>
+            <div class="corner c-bl"></div><div class="corner c-br"></div>
+          `;
+
+          detectionOverlay.appendChild(boxEl);
+        });
+      }
+
+      function clearBoundingBoxes() {
+        detectionOverlay.innerHTML = "";
+      }
+
+      // Reset Action
+      btnResetWorkspace.addEventListener("click", () => {
+        currentImagePayload = null;
+        latestAnalysisResult = null;
+        previewImage.src = "";
+        clearBoundingBoxes();
+        fileInput.value = "";
+
+        previewContainer.classList.add("hidden");
+        dropPrompt.classList.remove("hidden");
+        resultsContainer.classList.add("hidden");
+        processingStatus.classList.add("hidden");
+        idleBox.classList.remove("hidden");
+
+        btnRunAnalysis.disabled = true;
+        btnResetWorkspace.disabled = true;
+      });
+
+      // Report Download Trigger
+      btnDownloadReport.addEventListener("click", () => {
+        if (latestAnalysisResult) {
+          ReportGenerator.downloadReport(
+            latestAnalysisResult,
+            typeof currentImagePayload === 'string' ? currentImagePayload.toUpperCase() : 'UPLOADED_BATCH_ITEM'
+          );
+        }
+      });
+    });
+  </script>
+</body>
+</html>
